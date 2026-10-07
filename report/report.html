@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Power and Overconfidence — demo study</title>
+<style>
+  @page { size: A4; margin: 14mm 16mm; }
+  body { font-family: Georgia, 'Times New Roman', serif; font-size: 10pt; line-height: 1.38; color: #222; margin: 0; }
+  h1 { font-size: 15pt; margin: 0 0 2px; }
+  .sub { color: #555; font-size: 9pt; margin-bottom: 8px; }
+  .banner { background: #FFF4E5; border-left: 3px solid #E67E22; padding: 5px 9px; font-size: 8.8pt; margin-bottom: 8px; }
+  h2 { font-size: 10.5pt; margin: 9px 0 3px; text-transform: uppercase; letter-spacing: .04em; color: #1F3A5F; }
+  p { margin: 0 0 5px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  img { width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin-top: 4px; }
+  th, td { border-bottom: 1px solid #ddd; padding: 2px 4px; text-align: left; }
+  th { color: #555; font-weight: normal; }
+  ul { margin: 0 0 5px 16px; padding: 0; }
+  li { margin-bottom: 2px; }
+  .foot { font-size: 8pt; color: #666; border-top: 1px solid #ddd; padding-top: 4px; margin-top: 8px; }
+</style></head><body>
+
+<h1>Does Feeling Powerful Make Us Overconfident?</h1>
+<div class="sub">A demo experiment and analysis pipeline · Nico Scholtis · October 2026</div>
+<div class="banner"><b>Note:</b> this is a learning exercise. The experiment is fully functional,
+but the results below come from <b>simulated data</b> (N = 120), generated to build and test the
+analysis before any real data collection. They are not empirical findings.</div>
+
+<h2>Research question</h2>
+<p>Research on the psychology of power suggests that holding power changes how people perceive
+themselves and others, and that overconfidence can spread and persist in groups. This demo asks a
+simple question: <b>does recalling an experience of power increase overconfidence in one's own
+judgments?</b></p>
+
+<div class="grid">
+<div>
+<h2>Design</h2>
+<ul>
+  <li><b>Manipulation</b> (between-subjects): episodic recall of a time one had power over
+  someone (<i>high power</i>) vs. someone had power over oneself (<i>low power</i>)
+  (Galinsky, Gruenfeld &amp; Magee, 2003).</li>
+  <li><b>Task:</b> 10 two-alternative general-knowledge questions, each followed by a
+  confidence rating (50% = guessing, 100% = certain).</li>
+  <li><b>DV:</b> overconfidence = mean confidence − % correct (in points; 0 = well calibrated).</li>
+  <li><b>Checks:</b> felt power (1–7); accuracy, to rule out a knowledge difference.</li>
+  <li>Built in <b>jsPsych</b> (runs in any browser); analysis in <b>Python</b>
+  (pandas, SciPy), with a fixed random seed for reproducibility.</li>
+</ul>
+</div>
+<div><img src="../figures/overconfidence_by_condition.png" alt="Overconfidence by condition"></div>
+</div>
+
+<h2>Results (simulated)</h2>
+<table>
+  <tr><th>Measure</th><th>High power M (SD)</th><th>Low power M (SD)</th><th>Test</th></tr>
+  <tr><td>Felt power (1–7)</td><td>4.90 (1.37)</td>
+      <td>3.33 (1.13)</td>
+      <td><i>t</i>(114) = 6.82, <i>p</i> < .001, <i>d</i> = 1.25</td></tr>
+  <tr><td>Accuracy (%)</td><td>66.2 (17.5)</td>
+      <td>66.8 (18.5)</td>
+      <td><i>t</i>(118) = -0.20, <i>p</i> = .839</td></tr>
+  <tr><td><b>Overconfidence (pts)</b></td><td><b>12.4</b> (19.0)</td>
+      <td><b>2.6</b> (19.2)</td>
+      <td><i>t</i>(118) = 2.81, <i>p</i> = .006, <i>d</i> = 0.51</td></tr>
+</table>
+<p style="margin-top:5px">The manipulation check worked, and there was no evidence of an accuracy difference between conditions.
+Participants were overconfident overall (M = 7.5 pts, <i>t</i>(119) = 4.16, <i>p</i> < .001),
+and those in the high-power condition were more overconfident (difference = 9.8 pts,
+95% CI [2.9, 16.7], Welch's <i>t</i>-test). Because the data are simulated,
+these numbers only show that the pipeline works end to end.</p>
+
+<div class="grid">
+<div>
+<h2>Limitations &amp; next steps</h2>
+<ul>
+  <li>The simulation assumed a small true effect (5 confidence points, <i>d</i> ≈ 0.23). With 60 per
+  condition, a Monte Carlo check shows only ~24% power, so the significant result here is partly a
+  lucky draw. A real study would need ≈ 290 per condition for 80% power, and a pre-registered
+  sample size.</li>
+  <li>Recall manipulations can be weak online; consider attention and writing-quality checks.</li>
+  <li>Possible extension: a social condition to test whether overconfidence spreads from
+  high-power partners.</li>
+</ul>
+</div>
+<div>
+<h2>How I used Claude Code</h2>
+<ul>
+  <li>I described the study in plain language; Claude Code wrote the jsPsych experiment,
+  the simulation and the analysis scripts.</li>
+  <li>I ran the experiment myself as a participant, checked the data and figures, and asked
+  Claude to justify each statistical choice (e.g., Welch vs. Student's <i>t</i>).</li>
+  <li>Takeaway: AI agents can greatly speed up lab work, but the researcher must still
+  check the design, the code and the interpretation.</li>
+</ul>
+</div>
+</div>
+
+<div class="foot">Materials: experiment (<code>experiment/index.html</code>), simulation and analysis
+scripts (<code>analysis/</code>), data (<code>data/</code>). Reference: Galinsky, A. D., Gruenfeld, D. H.,
+&amp; Magee, J. C. (2003). From power to action. <i>JPSP, 85</i>(3), 453–466.</div>
+</body></html>

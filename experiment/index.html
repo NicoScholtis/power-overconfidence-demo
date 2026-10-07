@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Power & Confidence Study (demo)</title>
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.3"></script>
+  <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
+  <style>
+    body { font-family: Georgia, "Times New Roman", serif; }
+    .jspsych-content { max-width: 720px; text-align: left; line-height: 1.5; }
+    .center { text-align: center; }
+    .options label { display: block; margin: 8px 0; font-size: 18px; cursor: pointer; }
+    .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+    .slider-row input[type=range] { flex: 1; }
+    .conf-value { font-weight: bold; min-width: 48px; }
+    .small { font-size: 14px; color: #555; }
+    /* Slider shows no value (no thumb) until the participant moves it */
+    input[type=range].untouched::-webkit-slider-thumb { opacity: 0; }
+    input[type=range].untouched::-moz-range-thumb { opacity: 0; }
+  </style>
+</head>
+<body></body>
+<script>
+/* =========================================================
+   Power & Overconfidence — demo experiment (jsPsych 7)
+   Design: 2 conditions (high vs. low power), between-subjects.
+   Manipulation: episodic recall (Galinsky, Gruenfeld & Magee, 2003).
+   DV: overconfidence = mean confidence (%) - accuracy (%)
+       on 10 two-alternative general-knowledge questions.
+   ========================================================= */
+
+const jsPsych = initJsPsych({
+  on_finish: function () {
+    const id = jsPsych.data.get().values()[0].participant_id;
+    jsPsych.data.get().ignore('stimulus').localSave('csv', `power_confidence_${id}.csv`);
+  }
+});
+
+// Random condition assignment and participant ID
+const condition = jsPsych.randomization.sampleWithoutReplacement(['high_power', 'low_power'], 1)[0];
+const participantId = jsPsych.randomization.randomID(8);
+jsPsych.data.addProperties({ participant_id: participantId, condition: condition });
+
+// ---------- Consent ----------
+const consent = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <h2>Informed consent</h2>
+    <p>This is a short study (about 8 minutes) on memory and general knowledge.
+    You will be asked to write about a personal experience and to answer some
+    general-knowledge questions.</p>
+    <p>Participation is voluntary and you may stop at any time. Your responses are
+    anonymous and will be used for research purposes only.</p>
+    <p class="small">Demo version built for learning purposes — no data is sent anywhere;
+    responses are saved only to your own computer at the end.</p>
+    <p>Do you agree to participate?</p>`,
+  choices: ['I agree', 'I do not agree'],
+  data: { task: 'consent' }
+};
+
+const noConsent = {
+  timeline: [{
+    type: jsPsychHtmlButtonResponse,
+    stimulus: '<p class="center">Thank you. You can close this window now.</p>',
+    choices: [],
+    trial_duration: null
+  }],
+  conditional_function: () => jsPsych.data.get().last(1).values()[0].response === 1
+};
+
+// ---------- Power manipulation (episodic recall) ----------
+const recallPrompts = {
+  high_power: `Please recall a particular incident in which <b>you had power over another
+    individual or individuals</b>. By power, we mean a situation in which you controlled
+    the ability of another person or persons to get something they wanted, or were in a
+    position to evaluate those individuals. Please describe this situation — what
+    happened, how you felt, etc.`,
+  low_power: `Please recall a particular incident in which <b>someone else had power over
+    you</b>. By power, we mean a situation in which someone had control over your ability
+    to get something you wanted, or was in a position to evaluate you. Please describe
+    this situation — what happened, how you felt, etc.`
+};
+
+const countWords = text => (text.trim().match(/\S+/g) || []).length;
+
+// The Continue button stays disabled until a requirement is met
+const nextButton = () => document.querySelector('#jspsych-survey-html-form-next');
+
+const recall = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `<h3>Writing task</h3><p>${recallPrompts[condition]}</p>`,
+  html: `<textarea name="recall_text" rows="8" style="width:100%;font-size:16px" required></textarea>`,
+  button_label: 'Continue',
+  data: { task: 'power_recall' },
+  on_finish: function (data) {
+    data.recall_text = data.response.recall_text;
+    data.recall_words = countWords(data.recall_text);
+  }
+};
+
+// ---------- General-knowledge questions with confidence ----------
+// Two-alternative questions; confidence on a half-range scale (50% = guessing).
+const items = [
+  { q: 'Which river is longer?', a: 'Mississippi', b: 'Danube' },
+  { q: 'Which city is further north?', a: 'Rome', b: 'New York' },
+  { q: 'Which country has the larger population?', a: 'Australia', b: 'Netherlands' },
+  { q: 'Which came first?', a: 'Founding of Oxford University', b: 'Founding of Tenochtitlan (Aztec capital)' },
+  { q: 'Which mountain is taller?', a: 'Kilimanjaro', b: 'Mont Blanc' },
+  { q: 'Which element has the higher atomic number?', a: 'Copper', b: 'Iron' },
+  { q: 'Which country has the larger land area?', a: 'Mexico', b: 'Indonesia' },
+  { q: 'Which planet has more known moons?', a: 'Saturn', b: 'Jupiter' },
+  { q: 'Which city is further west?', a: 'Reno, Nevada', b: 'Los Angeles, California' },
+  { q: 'Who was born first?', a: 'Isaac Newton', b: 'Johann Sebastian Bach' }
+]; // option "a" is always the correct answer; display order is randomized below
+
+const quizIntro = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `<h3>General-knowledge questions</h3>
+    <p>You will now answer a series of questions. Each has two possible answers — choose the
+    one you think is correct.</p>
+    <p>After each answer, use the slider to indicate how confident you are that you were right:
+    <b>50%</b> means you were just guessing, <b>100%</b> means you are completely sure.
+    Please read every question carefully.</p>`,
+  choices: ['Start'],
+  data: { task: 'instructions' }
+};
+
+// Attention check, shown in the middle of the questions. Pass = "Banana" AND confidence 100%.
+const attentionItem = {
+  q: 'To show that you are reading carefully, please select "Banana" and move the confidence slider to 100%.',
+  a: 'Banana', b: 'Apple', isAttentionCheck: true
+};
+const quizSequence = jsPsych.randomization.shuffle(items);
+quizSequence.splice(5, 0, attentionItem);
+
+// The slider has no value until the participant moves it (the thumb is hidden until then);
+// Next stays disabled until an answer is chosen AND the slider has been moved.
+const quizTrials = quizSequence.map((item, i) => {
+  const options = jsPsych.randomization.shuffle([item.a, item.b]);
+  return {
+    type: jsPsychSurveyHtmlForm,
+    preamble: item.isAttentionCheck
+      ? `<h3>${item.q}</h3>`
+      : `<p class="small">Question ${quizSequence.slice(0, i + 1).filter(x => !x.isAttentionCheck).length}
+         of ${items.length}</p><h3>${item.q}</h3>`,
+    html: `
+      <div class="options">
+        ${options.map(o => `<label><input type="radio" name="answer" value="${o}" required> ${o}</label>`).join('')}
+      </div>
+      <p>How confident are you that your answer is correct?</p>
+      <div class="slider-row">
+        <span>50%<br><span class="small">guessing</span></span>
+        <input type="range" name="confidence" min="50" max="100" step="5" value="75" class="untouched">
+        <span>100%<br><span class="small">certain</span></span>
+        <span class="conf-value">—</span>
+      </div>
+      <p class="small slider-hint">Click or drag the slider to give your answer.</p>`,
+    button_label: 'Next',
+    data: item.isAttentionCheck
+      ? { task: 'attention_check' }
+      : { task: 'quiz', question: item.q, correct_answer: item.a },
+    on_load: function () {
+      let sliderMoved = false;
+      const slider = document.querySelector('input[name=confidence]');
+      const update = () => {
+        const answered = document.querySelector('input[name=answer]:checked') !== null;
+        nextButton().disabled = !(answered && sliderMoved);
+      };
+      const markMoved = () => {
+        sliderMoved = true;
+        slider.classList.remove('untouched');
+        document.querySelector('.conf-value').textContent = slider.value + '%';
+        document.querySelector('.slider-hint').style.visibility = 'hidden';
+        update();
+      };
+      ['pointerdown', 'input', 'change', 'keydown'].forEach(ev => slider.addEventListener(ev, markMoved));
+      slider.addEventListener('input', () => {
+        document.querySelector('.conf-value').textContent = slider.value + '%';
+      });
+      document.querySelectorAll('input[name=answer]').forEach(r => r.addEventListener('change', update));
+      update();
+    },
+    on_finish: function (data) {
+      data.answer = data.response.answer;
+      data.confidence = Number(data.response.confidence);
+      if (item.isAttentionCheck) {
+        data.attention_passed = (data.answer === 'Banana' && data.confidence === 100) ? 1 : 0;
+      } else {
+        data.correct = data.answer === data.correct_answer ? 1 : 0;
+      }
+    }
+  };
+});
+
+const estimate = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: '<h3>One more question</h3>',
+  html: `<p>How many of the 10 questions do you think you answered correctly?</p>
+         <input type="number" name="estimated_correct" min="0" max="10" required style="font-size:18px;width:80px">`,
+  button_label: 'Continue',
+  data: { task: 'estimate' },
+  on_finish: data => { data.estimated_correct = Number(data.response.estimated_correct); }
+};
+
+// ---------- Manipulation check & demographics ----------
+const scale7 = ['1<br>Not at all', '2', '3', '4', '5', '6', '7<br>Very much'];
+const manipCheck = {
+  type: jsPsychSurveyLikert,
+  preamble: '<h3>About the writing task</h3>',
+  questions: [{ prompt: 'While writing about the incident, how <b>powerful</b> did you feel?',
+                name: 'felt_power', labels: scale7, required: true }],
+  data: { task: 'manipulation_check' },
+  on_finish: data => { data.felt_power = data.response.felt_power + 1; } // store as 1–7
+};
+
+const demographics = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: '<h3>About you</h3>',
+  html: `<p>Age: <input type="number" name="age" min="16" max="99" required></p>
+         <p>Gender:
+           <select name="gender" required>
+             <option value="">Select…</option><option>Female</option><option>Male</option>
+             <option>Non-binary</option><option>Prefer not to say</option>
+           </select></p>`,
+  button_label: 'Continue',
+  data: { task: 'demographics' },
+  on_finish: data => {
+    data.age = Number(data.response.age);
+    data.gender = data.response.gender;
+  }
+};
+
+// ---------- Suspicion probe (asked BEFORE the study is explained) ----------
+const suspicion = {
+  type: jsPsychSurveyText,
+  preamble: '<h3>Last question</h3>',
+  questions: [{ prompt: 'What do you think this study was about?', name: 'suspicion',
+                rows: 4, columns: 70, required: true }],
+  button_label: 'Continue',
+  data: { task: 'suspicion_probe' },
+  on_finish: data => { data.suspicion = data.response.suspicion; }
+};
+
+// ---------- Debriefing (shows the participant their own result) ----------
+const debrief = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: function () {
+    const quiz = jsPsych.data.get().filter({ task: 'quiz' });
+    const accuracy = quiz.select('correct').mean() * 100;
+    const confidence = quiz.select('confidence').mean();
+    const oc = confidence - accuracy;
+    return `<h2>Thank you!</h2>
+      <p>This study examines whether recalling an experience of <b>power</b> makes people
+      more <b>overconfident</b>. You were randomly assigned to write about a time when
+      ${condition === 'high_power' ? 'you had power over someone' : 'someone had power over you'}.</p>
+      <p>Your results: average confidence <b>${confidence.toFixed(0)}%</b>,
+      actual accuracy <b>${accuracy.toFixed(0)}%</b>
+      → overconfidence score <b>${oc > 0 ? '+' : ''}${oc.toFixed(0)}</b> points
+      (positive = more confident than accurate).</p>
+      <p class="small">Clicking "Finish" will download your responses as a CSV file.</p>`;
+  },
+  choices: ['Finish'],
+  data: { task: 'debrief' }
+};
+
+const mainStudy = {
+  timeline: [recall, quizIntro, ...quizTrials, estimate, manipCheck, demographics, suspicion, debrief],
+  conditional_function: () => jsPsych.data.get().filter({ task: 'consent' }).values()[0].response === 0
+};
+
+jsPsych.run([consent, noConsent, mainStudy]);
+</script>
+</html>
